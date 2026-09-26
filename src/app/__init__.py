@@ -1,6 +1,12 @@
-from flask import Flask
-from flask import request, jsonify
-from .service.messageService import MessageService
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from flask import Flask 
+from flask import request, jsonify 
+from app.service.messageService import MessageService
 from kafka import KafkaProducer
 import json
 import os
@@ -28,9 +34,17 @@ def handle_message():
     result = messageService.process_message(message)
 
     if result is not None:
-        serialized_result = result.serialize()
+        if isinstance(result, dict):
+            serialized_result = dict(result)
+        elif hasattr(result, 'serialize'):
+            serialized_result = result.serialize()
+        elif hasattr(result, 'dict'):
+            serialized_result = result.dict()
+        else:
+            serialized_result = dict(result)
         serialized_result['user_id'] = user_id
         producer.send('expense_service', serialized_result)
+        producer.flush()
         return jsonify(serialized_result)
     else:
         return jsonify({'error': 'Invalid message format'}), 400
